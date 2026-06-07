@@ -1,0 +1,15 @@
+# Secrets — never commit your real key
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+*.egg-info/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
