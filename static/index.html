@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NetworkIQ</title>
+<style>
+  :root { --bg:#0b0f1a; --card:#131a2b; --line:#28324a; --txt:#e7ecf5; --mut:#8a93a6;
+          --accent:#4f8cff; --good:#6ee7a8; }
+  * { box-sizing:border-box; }
+  body { font-family:-apple-system,system-ui,Segoe UI,sans-serif; background:var(--bg);
+         color:var(--txt); margin:0; padding:32px; }
+  .wrap { max-width:860px; margin:0 auto; }
+  h1 { margin:0; font-size:26px; }
+  .tag { color:var(--mut); font-size:14px; margin:4px 0 24px; }
+  label { display:block; font-size:13px; color:var(--mut); margin:14px 0 6px; }
+  textarea, input { width:100%; background:var(--card); color:var(--txt);
+    border:1px solid var(--line); border-radius:10px; padding:12px; font-size:14px; }
+  textarea { resize:vertical; }
+  .row { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; }
+  .row > div { flex:1; min-width:160px; }
+  button { background:var(--accent); color:#fff; border:0; border-radius:10px;
+    padding:12px 22px; font-size:15px; font-weight:600; cursor:pointer; }
+  button.ghost { background:var(--line); }
+  button:disabled { opacity:.5; cursor:default; }
+  .status { margin:16px 0; font-size:13px; color:var(--good); min-height:18px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:18px; margin-top:14px; }
+  .card.top { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; }
+  .head { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+  .name { font-size:18px; font-weight:700; }
+  .score { font-size:13px; font-weight:700; padding:4px 10px; border-radius:20px;
+    background:#1d2a45; color:var(--good); white-space:nowrap; }
+  .reason { color:var(--mut); font-size:13px; margin:6px 0; font-style:italic; }
+  .brief { font-size:14px; margin:8px 0; line-height:1.5; }
+  .topics span { display:inline-block; background:#1d2a45; color:#bcd; font-size:12px;
+    padding:3px 9px; border-radius:20px; margin:2px 6px 2px 0; }
+  .starters { margin:10px 0 0; padding:0; list-style:none; }
+  .starters li { background:#0f1626; border:1px solid var(--line); border-radius:9px;
+    padding:9px 12px; margin:6px 0; font-size:14px; display:flex; justify-content:space-between;
+    gap:10px; align-items:center; }
+  .spk { background:var(--line); border:0; color:var(--txt); border-radius:7px;
+    padding:5px 10px; font-size:12px; cursor:pointer; }
+  .src a { color:var(--mut); font-size:11px; margin-right:8px; }
+  .note { color:#f6c177; font-size:13px; margin-top:10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🧠 NetworkIQ</h1>
+  <p class="tag">Type your goals + an event source. It finds the people, ranks them, and gives you openers — read aloud in your ear.</p>
+
+  <label>Your networking goals</label>
+  <input id="goals" placeholder="e.g. Founder raising pre-seed; want early-stage AI investors and design-partner customers" />
+
+  <label>Event source — a Luma/Partiful link, OR paste names (one per line: "Name, hint")</label>
+  <textarea id="source" rows="5" placeholder="https://lu.ma/your-event
+— or —
+Jane Smith, Acme Ventures
+John Doe, founder at BuildCo
+Priya Nair, NY Tech Week AI dinner"></textarea>
+
+  <div class="row" style="margin-top:16px;">
+    <button id="run">▶ Run scan</button>
+    <button id="demo" class="ghost">Load demo names</button>
+    <label style="display:flex;align-items:center;gap:8px;margin:0;color:var(--txt);font-size:14px;cursor:pointer;">
+      <input type="checkbox" id="demoMode" style="width:auto;" /> Demo mode (instant, no API)
+    </label>
+  </div>
+
+  <div class="status" id="status"></div>
+  <div id="results"></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const synth = window.speechSynthesis;
+
+function speak(text){ synth.cancel(); const u = new SpeechSynthesisUtterance(text); u.rate=1; synth.speak(u); }
+
+$("demo").onclick = () => {
+  $("goals").value = "Founder raising a pre-seed round; looking for early-stage AI investors and design-partner customers.";
+  $("source").value = "Jane Smith, Acme Ventures\nJohn Doe, founder at BuildCo\nPriya Nair, NY Tech Week AI dinner";
+};
+
+$("run").onclick = async () => {
+  const goals = $("goals").value.trim();
+  const source = $("source").value.trim();
+  const demo = $("demoMode").checked;
+  if(!demo && (!goals || !source)){ $("status").textContent = "Fill in both goals and a source."; return; }
+  $("run").disabled = true;
+  $("results").innerHTML = "";
+  $("status").textContent = demo
+    ? "Demo mode — loading sample result…"
+    : "Ingesting source → researching each person → scoring → writing starters… (this can take 20–60s)";
+
+  try {
+    const res = await fetch("/api/run", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ goals, source, top_n: 5, demo })
+    });
+    const data = await res.json();
+    if(data.error){ $("status").textContent = "Error: " + data.error; $("run").disabled=false; return; }
+    render(data);
+    $("status").textContent = data.people.length ? "Done. Tap 🔊 to hear an opener." : "";
+  } catch(e){
+    $("status").textContent = "Request failed: " + e;
+  }
+  $("run").disabled = false;
+};
+
+function esc(s){ return (s||"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+function render(data){
+  const box = $("results");
+  if(data.note){ const n=document.createElement("div"); n.className="note"; n.textContent="ℹ "+data.note; box.appendChild(n); }
+  data.people.forEach((p, i) => {
+    const card = document.createElement("div");
+    card.className = "card" + (i===0 ? " top" : "");
+    const topics = (p.topics||[]).map(t=>`<span>${esc(t)}</span>`).join("");
+    const starters = (p.starters||[]).map(s =>
+      `<li><span>${esc(s)}</span><button class="spk">🔊</button></li>`).join("");
+    const sources = (p.sources||[]).slice(0,3).map((u,k)=>`<a href="${esc(u)}" target="_blank">[${k+1}]</a>`).join("");
+    card.innerHTML = `
+      <div class="head">
+        <div class="name">${i===0?"⭐ ":""}${esc(p.name)}</div>
+        <div class="score">ROI ${p.score ?? 0}</div>
+      </div>
+      ${p.reason?`<div class="reason">${esc(p.reason)}</div>`:""}
+      <div class="brief">${esc(p.brief)||"<i>No info found.</i>"}</div>
+      <div class="topics">${topics}</div>
+      ${starters?`<ul class="starters">${starters}</ul>`:""}
+      ${sources?`<div class="src">sources: ${sources}</div>`:""}`;
+    card.querySelectorAll(".spk").forEach((btn,idx)=>{
+      btn.onclick = () => speak(`${p.name}. ${(p.starters||[])[idx]||""}`);
+    });
+    box.appendChild(card);
+  });
+}
+</script>
+</body>
+</html>
