@@ -1,6 +1,10 @@
 # 🧠 NetworkIQ
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/rmn2151-blip/networkiq)
+
 Walk into an event already knowing who to talk to, why, and what to say.
+
+> One-click deploy: hit the button above, sign in with GitHub, and paste your GMI Cloud API key when Render asks for the `GMI_API_KEY` secret. You'll get your own live URL in ~3 minutes.
 
 You give it **your goals** + an **event source** (a Luma/Partiful link or pasted names). A 4-step agent pipeline running on **GMI Cloud** then:
 
